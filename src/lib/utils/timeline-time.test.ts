@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
 	formatYear,
+	dateToFractionalYear,
+	formatEventDisplayDate,
 	calculateTickInterval,
+	generateAdaptiveRulerTicks,
 	exportTimelineJson,
 	exportTimelineCsv
 } from './timeline-time';
 
-describe('Timeline Time Utilities & BCE Support', () => {
+describe('Timeline Time Utilities & Adaptive Multi-Scale Engine', () => {
 	it('correctly formats Common Era (CE) years', () => {
 		expect(formatYear(2026)).toBe('2026');
 		expect(formatYear(1969)).toBe('1969');
@@ -23,21 +26,73 @@ describe('Timeline Time Utilities & BCE Support', () => {
 		expect(formatYear(0)).toBe('1 BCE');
 	});
 
-	it('calculates adaptive tick interval based on zoom factor', () => {
-		// Low zoom (zoomed out far)
-		const zoomedOut = calculateTickInterval(0.01);
-		expect(zoomedOut.major).toBe(1000);
-		expect(zoomedOut.format).toBe('millennium');
+	it('calculates fractional years from optional date strings', () => {
+		// Null or empty date retains integer year
+		expect(dateToFractionalYear(1492, null)).toBe(1492);
+		expect(dateToFractionalYear(1492, '')).toBe(1492);
 
-		// Medium zoom (century view)
-		const mediumZoom = calculateTickInterval(1);
-		expect(mediumZoom.major).toBe(100);
-		expect(mediumZoom.format).toBe('century');
+		// Jan 1st is 0.0 fraction
+		expect(dateToFractionalYear(2024, '2024-01-01')).toBe(2024);
 
-		// High zoom (year/month view)
-		const highZoom = calculateTickInterval(60);
-		expect(highZoom.major).toBe(1);
-		expect(highZoom.format).toBe('month');
+		// Mid-year is approximately 0.5
+		const midYear = dateToFractionalYear(2024, '2024-07-02');
+		expect(midYear).toBeGreaterThan(2024.49);
+		expect(midYear).toBeLessThan(2024.52);
+
+		// Dec 31st is close to next year
+		const endYear = dateToFractionalYear(2023, '2023-12-31');
+		expect(endYear).toBeGreaterThan(2023.99);
+	});
+
+	it('formats event display date adaptively based on whether specific date was provided', () => {
+		// Year only (no date)
+		expect(formatEventDisplayDate(1492, null)).toBe('1492');
+		expect(formatEventDisplayDate(-500, undefined)).toBe('500 BCE');
+
+		// Full date
+		expect(formatEventDisplayDate(1969, '1969-07-20')).toBe('Jul 20, 1969');
+		expect(formatEventDisplayDate(1989, '1989-11-09')).toBe('Nov 9, 1989');
+
+		// Month and year only
+		expect(formatEventDisplayDate(1945, '1945-05')).toBe('May 1945');
+	});
+
+	it('calculates adaptive tick interval across multiple scales from millennia to days', () => {
+		// Millennium scale
+		const millenniumZoom = calculateTickInterval(0.01);
+		expect(millenniumZoom.format).toBe('millennium');
+		expect(millenniumZoom.major).toBe(1000);
+
+		// Century scale
+		const centuryZoom = calculateTickInterval(1);
+		expect(centuryZoom.format).toBe('century');
+		expect(centuryZoom.major).toBe(100);
+
+		// Decade scale
+		const decadeZoom = calculateTickInterval(8);
+		expect(decadeZoom.format).toBe('decade');
+		expect(decadeZoom.major).toBe(10);
+
+		// Year scale
+		const yearZoom = calculateTickInterval(30);
+		expect(yearZoom.format).toBe('year');
+		expect(yearZoom.major).toBe(5);
+
+		// Month scale
+		const monthZoom = calculateTickInterval(100);
+		expect(monthZoom.format).toBe('month');
+
+		// Day scale
+		const dayZoom = calculateTickInterval(500);
+		expect(dayZoom.format).toBe('day');
+	});
+
+	it('generates adaptive ruler ticks with month subdivisions when zoomed in', () => {
+		const ticks = generateAdaptiveRulerTicks(2024.0, 2024.5, 120);
+		expect(ticks.length).toBeGreaterThan(0);
+		expect(ticks.some((t) => t.label === '2024')).toBe(true);
+		expect(ticks.some((t) => t.label === 'Feb')).toBe(true);
+		expect(ticks.some((t) => t.label === 'Mar')).toBe(true);
 	});
 
 	it('exports timeline data to valid JSON schema', () => {
@@ -65,9 +120,9 @@ describe('Timeline Time Utilities & BCE Support', () => {
 				id: 'evt-2',
 				title: 'Bronze Age "Early"',
 				startYear: -3300,
-				startDate: '-3300-01-01',
+				startDate: null,
 				endYear: -1200,
-				endDate: '-1200-01-01',
+				endDate: null,
 				isSpan: true,
 				color: '#f59e0b',
 				tags: ['Ancient', 'Metallurgy'],

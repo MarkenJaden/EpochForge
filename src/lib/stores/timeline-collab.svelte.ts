@@ -6,7 +6,7 @@ export interface TimelineEventData {
 	title: string;
 	description: string;
 	startYear: number;
-	startDate: string;
+	startDate?: string | null;
 	endYear?: number | null;
 	endDate?: string | null;
 	isSpan: boolean;
@@ -128,7 +128,7 @@ export class TimelineCollabClient {
 					title: item.get('title') || 'Untitled Event',
 					description: item.get('description') || '',
 					startYear: item.get('startYear') ?? 2026,
-					startDate: item.get('startDate') || '2026-01-01',
+					startDate: item.get('startDate') ?? null,
 					endYear: item.get('endYear') ?? null,
 					endDate: item.get('endDate') ?? null,
 					isSpan: Boolean(item.get('isSpan')),
@@ -158,7 +158,7 @@ export class TimelineCollabClient {
 		map.set('title', event.title);
 		map.set('description', event.description);
 		map.set('startYear', event.startYear);
-		map.set('startDate', event.startDate);
+		map.set('startDate', event.startDate ?? null);
 		map.set('endYear', event.endYear ?? null);
 		map.set('endDate', event.endDate ?? null);
 		map.set('isSpan', event.isSpan);

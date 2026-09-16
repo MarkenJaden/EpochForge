@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { TimelineEventData } from '$lib/stores/timeline-collab.svelte';
-	import { formatYear, calculateTickInterval } from '$lib/utils/timeline-time';
+	import {
+		formatYear,
+		calculateTickInterval,
+		dateToFractionalYear,
+		formatEventDisplayDate,
+		generateAdaptiveRulerTicks
+	} from '$lib/utils/timeline-time';
 	import { Tag, Sparkles } from 'lucide-svelte';
 
 	let {
@@ -29,20 +35,33 @@
 
 	let pxPerYear = $derived(BASE_PX_PER_YEAR * zoomLevel);
 
+	// Fractional coordinates for events
+	let eventCoordinates = $derived(
+		events.map((e) => {
+			const startFrac = dateToFractionalYear(e.startYear, e.startDate);
+			const endFrac = e.isSpan && e.endYear ? dateToFractionalYear(e.endYear, e.endDate) : startFrac;
+			return {
+				event: e,
+				startFrac,
+				endFrac
+			};
+		})
+	);
+
 	// Determine min and max years across events
 	let minYear = $derived.by(() => {
-		if (events.length === 0) return 2000;
-		return Math.min(...events.map((e) => e.startYear)) - 5;
+		if (eventCoordinates.length === 0) return 2000;
+		return Math.min(...eventCoordinates.map((e) => e.startFrac)) - 5;
 	});
 
 	let maxYear = $derived.by(() => {
-		if (events.length === 0) return 2030;
-		return Math.max(...events.map((e) => (e.isSpan && e.endYear ? e.endYear : e.startYear))) + 5;
+		if (eventCoordinates.length === 0) return 2030;
+		return Math.max(...eventCoordinates.map((e) => (e.event.isSpan ? e.endFrac : e.startFrac))) + 5;
 	});
 
 	// Convert year to pixel position relative to origin (minYear)
-	function yearToPx(year: number): number {
-		return (year - minYear) * pxPerYear + panX;
+	function yearToPx(fracYear: number): number {
+		return (fracYear - minYear) * pxPerYear + panX;
 	}
 
 	// Convert pixel position to year
@@ -55,23 +74,25 @@
 		leftPx: number;
 		widthPx: number;
 		lane: number;
+		startFrac: number;
+		endFrac: number;
 	}
 
 	let laneEvents = $derived.by(() => {
-		const sorted = [...events].sort((a, b) => a.startYear - b.startYear);
+		const sorted = [...eventCoordinates].sort((a, b) => a.startFrac - b.startFrac);
 		const lanes: number[] = []; // stores rightmost edge for each lane
 		const positioned: LaneEvent[] = [];
 
-		for (const evt of sorted) {
-			const left = (evt.startYear - minYear) * pxPerYear;
-			const duration = evt.isSpan && evt.endYear ? Math.max(0.5, evt.endYear - evt.startYear) : 1;
+		for (const item of sorted) {
+			const left = (item.startFrac - minYear) * pxPerYear;
+			const duration = item.event.isSpan ? Math.max(0.3, item.endFrac - item.startFrac) : 0.4;
 			const width = Math.max(160, duration * pxPerYear);
 
 			// Find available lane
 			let assignedLane = 0;
 			let placed = false;
 			for (let i = 0; i < lanes.length; i++) {
-				if (left >= lanes[i] + 15) {
+				if (left >= lanes[i] + 16) {
 					assignedLane = i;
 					lanes[i] = left + width;
 					placed = true;
@@ -84,10 +105,12 @@
 			}
 
 			positioned.push({
-				...evt,
+				...item.event,
 				leftPx: left,
 				widthPx: width,
-				lane: assignedLane
+				lane: assignedLane,
+				startFrac: item.startFrac,
+				endFrac: item.endFrac
 			});
 		}
 
@@ -97,29 +120,17 @@
 	// Spans / Epochs for background band rendering
 	let epochSpans = $derived(events.filter((e) => e.isSpan && e.endYear));
 
-	// Ruler ticks
-	let tickConfig = $derived(calculateTickInterval(pxPerYear));
-
+	// Ruler ticks using multi-scale adaptive generator
 	let rulerTicks = $derived.by(() => {
 		if (!containerEl) return [];
-		const startVisibleYear = Math.floor(pxToYear(0));
-		const endVisibleYear = Math.ceil(pxToYear(containerWidth));
+		const startVisibleYear = pxToYear(-150);
+		const endVisibleYear = pxToYear(containerWidth + 150);
 
-		const major = tickConfig.major;
-		const ticks: Array<{ year: number; x: number; label: string; isMajor: boolean }> = [];
-
-		const firstTick = Math.floor(startVisibleYear / major) * major;
-		for (let y = firstTick - major; y <= endVisibleYear + major; y += major) {
-			const x = yearToPx(y);
-			ticks.push({
-				year: y,
-				x,
-				label: formatYear(y),
-				isMajor: true
-			});
-		}
-
-		return ticks;
+		const generated = generateAdaptiveRulerTicks(startVisibleYear, endVisibleYear, pxPerYear);
+		return generated.map((t) => ({
+			...t,
+			x: yearToPx(t.fractionalYear)
+		}));
 	});
 
 	// Drag & Pan handlers
@@ -153,7 +164,7 @@
 		const yearUnderMouse = pxToYear(mouseX);
 
 		const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-		const newZoom = Math.min(15, Math.max(0.05, zoomLevel * zoomFactor));
+		const newZoom = Math.min(25, Math.max(0.02, zoomLevel * zoomFactor));
 
 		const newPxPerYear = BASE_PX_PER_YEAR * newZoom;
 		const newPanX = mouseX - (yearUnderMouse - minYear) * newPxPerYear;
@@ -191,8 +202,10 @@
 	<!-- Background Epoch Spans -->
 	<div class="absolute inset-0 pointer-events-none overflow-hidden">
 		{#each epochSpans as span (span.id)}
-			{@const startX = yearToPx(span.startYear)}
-			{@const endX = yearToPx(span.endYear || span.startYear + 1)}
+			{@const startFrac = dateToFractionalYear(span.startYear, span.startDate)}
+			{@const endFrac = dateToFractionalYear(span.endYear || span.startYear + 1, span.endDate)}
+			{@const startX = yearToPx(startFrac)}
+			{@const endX = yearToPx(endFrac)}
 			{@const width = Math.max(10, endX - startX)}
 			{@const stickyLeft = Math.max(0, Math.min(width - 150, -startX + 16))}
 
@@ -220,7 +233,9 @@
 					>
 						<Sparkles class="w-3 h-3" />
 						<span>{span.title}</span>
-						<span class="text-[10px] opacity-80">({formatYear(span.startYear)} – {formatYear(span.endYear || span.startYear)})</span>
+						<span class="text-[10px] opacity-80">
+							({formatEventDisplayDate(span.startYear, span.startDate)} – {formatEventDisplayDate(span.endYear || span.startYear, span.endDate)})
+						</span>
 					</div>
 				</div>
 			{/if}
@@ -238,7 +253,7 @@
 					<span class="text-[11px] font-mono font-medium text-slate-400 mb-1">
 						{tick.label}
 					</span>
-					<div class="w-[1px] h-3 bg-slate-700"></div>
+					<div class="w-[1px] h-3 {tick.isMajor ? 'bg-slate-600' : 'bg-slate-800'}"></div>
 				</div>
 			{/if}
 		{/each}
@@ -247,7 +262,7 @@
 	<!-- Events Container (Scrollable/Pannable Track Area) -->
 	<div class="absolute inset-0 pt-28 pb-12 pointer-events-none">
 		{#each laneEvents as evt (evt.id)}
-			{@const x = yearToPx(evt.startYear)}
+			{@const x = yearToPx(evt.startFrac)}
 			{@const top = 120 + evt.lane * 96}
 
 			{#if x + evt.widthPx >= -200 && x <= containerWidth + 200}
@@ -273,9 +288,9 @@
 					>
 						<div class="flex items-center justify-between gap-2 mb-1">
 							<span class="text-[11px] font-mono font-semibold text-indigo-400">
-								{formatYear(evt.startYear)}
+								{formatEventDisplayDate(evt.startYear, evt.startDate)}
 								{#if evt.isSpan && evt.endYear}
-									– {formatYear(evt.endYear)}
+									– {formatEventDisplayDate(evt.endYear, evt.endDate)}
 								{/if}
 							</span>
 							{#if evt.isSpan}

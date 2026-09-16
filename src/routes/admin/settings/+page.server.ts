@@ -4,6 +4,7 @@ import {
 	getInstanceConfig,
 	setSetting
 } from '$lib/server/settings';
+import { getSmtpConfig, sendTestEmail } from '$lib/server/mail';
 import { invalidateAuthCache } from '$lib/server/auth';
 import { db, timelines, users, auditLogs, timelineCollaborators } from '$lib/server/db';
 import { desc, eq } from 'drizzle-orm';
@@ -11,9 +12,10 @@ import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const origin = url.origin;
-	const [providers, instance, allTimelines, allUsers, logs] = await Promise.all([
+	const [providers, instance, smtpConfig, allTimelines, allUsers, logs] = await Promise.all([
 		getAllSocialProviders(origin),
 		getInstanceConfig(),
+		getSmtpConfig(),
 		db
 			.select({
 				id: timelines.id,
@@ -60,6 +62,15 @@ export const load: PageServerLoad = async ({ url }) => {
 	return {
 		providers,
 		instance,
+		smtp: {
+			enabled: smtpConfig.enabled,
+			host: smtpConfig.host,
+			port: smtpConfig.port,
+			secure: smtpConfig.secure,
+			user: smtpConfig.user,
+			from: smtpConfig.from,
+			hasPassword: !!smtpConfig.pass
+		},
 		timelines: allTimelines,
 		users: allUsers,
 		auditLogs: logs
@@ -156,5 +167,46 @@ export const actions: Actions = {
 			.onConflictDoNothing();
 
 		return { success: true, message: 'Moderator assigned.' };
+	},
+
+	saveSmtp: async ({ request }) => {
+		const data = await request.formData();
+		const enabled = data.get('smtp_enabled') === 'on' ? 'true' : 'false';
+		const host = (data.get('smtp_host') as string)?.trim() || '';
+		const port = (data.get('smtp_port') as string)?.trim() || '587';
+		const secure = data.get('smtp_secure') === 'on' ? 'true' : 'false';
+		const user = (data.get('smtp_user') as string)?.trim() || '';
+		const password = (data.get('smtp_password') as string)?.trim();
+		const from = (data.get('smtp_from') as string)?.trim() || '';
+
+		await setSetting('smtp_enabled', enabled);
+		await setSetting('smtp_host', host);
+		await setSetting('smtp_port', port);
+		await setSetting('smtp_secure', secure);
+		await setSetting('smtp_user', user);
+		if (password) {
+			await setSetting('smtp_password', password, true);
+		}
+		if (from) {
+			await setSetting('smtp_from', from);
+		}
+
+		return { success: true, message: 'SMTP settings updated successfully.' };
+	},
+
+	testSmtp: async ({ request, locals }) => {
+		const data = await request.formData();
+		const testEmail = (data.get('test_email') as string)?.trim() || locals.user?.email;
+
+		if (!testEmail) {
+			return fail(400, { error: 'Please provide a valid recipient email address for testing.' });
+		}
+
+		const result = await sendTestEmail(testEmail);
+		if (!result.success) {
+			return fail(400, { error: result.error || 'Failed to send test email.' });
+		}
+
+		return { success: true, message: `Test email sent successfully to ${testEmail}!` };
 	}
 };

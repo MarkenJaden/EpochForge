@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { db } from './db';
 import * as schema from './db/schema';
 import { getSetting } from './settings';
+import { sendPasswordResetEmail } from './mail';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -79,7 +80,12 @@ export async function getAuth() {
 		baseURL: process.env.BETTER_AUTH_URL || process.env.ORIGIN || 'http://localhost:3000',
 		emailAndPassword: {
 			enabled: true,
-			requireEmailVerification: false
+			requireEmailVerification: false,
+			sendResetPassword: async ({ user, token }) => {
+				const baseUrl = (process.env.BETTER_AUTH_URL || process.env.ORIGIN || 'https://epochforge.markenjaden.de').replace(/\/+$/, '');
+				const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+				await sendPasswordResetEmail(user.email, resetUrl);
+			}
 		},
 		user: {
 			additionalFields: {

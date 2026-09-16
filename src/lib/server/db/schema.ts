@@ -99,7 +99,7 @@ export const events = pgTable('events', {
 	title: text('title').notNull(),
 	description: text('description').default(''),
 	startYear: integer('start_year').notNull(), // Supports negative years for BCE, e.g. -500
-	startDate: text('start_date').notNull(), // ISO-like or YYYY-MM-DD
+	startDate: text('start_date'), // Optional exact date ISO-like or YYYY-MM-DD
 	endYear: integer('end_year'), // Null for single point-in-time events
 	endDate: text('end_date'),
 	isSpan: boolean('is_span').default(false).notNull(), // true for epochs/spans

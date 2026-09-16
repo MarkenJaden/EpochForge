@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TimelineEventData } from '$lib/stores/timeline-collab.svelte';
-	import { formatYear } from '$lib/utils/timeline-time';
+	import { formatYear, formatEventDisplayDate, dateToFractionalYear } from '$lib/utils/timeline-time';
 	import { Calendar, Tag, Sparkles } from 'lucide-svelte';
 
 	let {
@@ -11,9 +11,11 @@
 		onSelectEvent: (event: TimelineEventData) => void;
 	} = $props();
 
-	// Sort events chronologically
+	// Sort events chronologically including fractional dates
 	let sortedEvents = $derived(
-		[...events].sort((a, b) => a.startYear - b.startYear)
+		[...events].sort(
+			(a, b) => dateToFractionalYear(a.startYear, a.startDate) - dateToFractionalYear(b.startYear, b.startDate)
+		)
 	);
 </script>
 
@@ -64,9 +66,9 @@
 									class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold text-white shadow"
 									style="background-color: {evt.color || '#6366f1'};"
 								>
-									{formatYear(evt.startYear)}
+									{formatEventDisplayDate(evt.startYear, evt.startDate)}
 									{#if evt.isSpan && evt.endYear}
-										– {formatYear(evt.endYear)}
+										– {formatEventDisplayDate(evt.endYear, evt.endDate)}
 									{/if}
 								</span>
 

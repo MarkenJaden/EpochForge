@@ -19,7 +19,7 @@
 	let description = $state('');
 	let isSpan = $state(false);
 	let startYear = $state(2026);
-	let startDate = $state('2026-01-01');
+	let startDate = $state('');
 	let endYear = $state<number | null>(null);
 	let endDate = $state<string | null>(null);
 	let color = $state('#6366f1');
@@ -54,7 +54,7 @@
 				description = initialEvent.description || '';
 				isSpan = initialEvent.isSpan;
 				startYear = initialEvent.startYear;
-				startDate = initialEvent.startDate;
+				startDate = initialEvent.startDate || '';
 				endYear = initialEvent.endYear ?? null;
 				endDate = initialEvent.endDate ?? null;
 				color = initialEvent.color || '#6366f1';
@@ -67,7 +67,7 @@
 				description = '';
 				isSpan = false;
 				startYear = new Date().getFullYear();
-				startDate = new Date().toISOString().slice(0, 10);
+				startDate = '';
 				endYear = null;
 				endDate = null;
 				color = '#6366f1';
@@ -91,9 +91,9 @@
 			description: description.trim(),
 			isSpan,
 			startYear: Number(startYear),
-			startDate,
+			startDate: startDate && startDate.trim() ? startDate.trim() : null,
 			endYear: isSpan ? (endYear !== null ? Number(endYear) : Number(startYear) + 1) : null,
-			endDate: isSpan ? endDate : null,
+			endDate: isSpan && endDate && endDate.trim() ? endDate.trim() : null,
 			color,
 			bgImageUrl,
 			bgPattern: bgPattern === 'none' ? undefined : bgPattern,
@@ -177,11 +177,17 @@
 					</div>
 
 					<div>
-						<label for="start-date" class="block text-xs font-semibold text-slate-300 mb-1">Specific Date (Optional)</label>
+						<label for="start-date" class="block text-xs font-semibold text-slate-300 mb-1">Specific Date <span class="text-slate-500 font-normal">(Optional)</span></label>
 						<input
 							type="date"
 							id="start-date"
 							bind:value={startDate}
+							onchange={() => {
+								if (startDate) {
+									const y = parseInt(startDate.slice(0, 4), 10);
+									if (!isNaN(y)) startYear = y;
+								}
+							}}
 							class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
 						/>
 					</div>
@@ -203,11 +209,17 @@
 						</div>
 
 						<div>
-							<label for="end-date" class="block text-xs font-semibold text-slate-300 mb-1">End Date (Optional)</label>
+							<label for="end-date" class="block text-xs font-semibold text-slate-300 mb-1">End Date <span class="text-slate-500 font-normal">(Optional)</span></label>
 							<input
 								type="date"
 								id="end-date"
 								bind:value={endDate}
+								onchange={() => {
+									if (endDate) {
+										const y = parseInt(endDate.slice(0, 4), 10);
+										if (!isNaN(y)) endYear = y;
+									}
+								}}
 								class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
 							/>
 						</div>

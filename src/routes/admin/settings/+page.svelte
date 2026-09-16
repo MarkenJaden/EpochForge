@@ -16,13 +16,16 @@
 		AlertCircle,
 		Bot,
 		Globe,
-		Calendar
+		Calendar,
+		Mail,
+		Send
 	} from 'lucide-svelte';
 
 	let { data, form } = $props();
 
-	let activeTab = $state<'auth' | 'system' | 'moderation' | 'audit'>('auth');
+	let activeTab = $state<'auth' | 'smtp' | 'system' | 'moderation' | 'audit'>('auth');
 	let copiedId = $state<string | null>(null);
+	let testingEmail = $state(false);
 	let showSecrets = $state<Record<string, boolean>>({});
 	let saving = $state(false);
 
@@ -70,6 +73,14 @@
 			>
 				<Key class="w-4 h-4" />
 				<span>Auth & Providers</span>
+			</button>
+
+			<button
+				onclick={() => (activeTab = 'smtp')}
+				class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all {activeTab === 'smtp' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}"
+			>
+				<Mail class="w-4 h-4" />
+				<span>SMTP & Email</span>
 			</button>
 
 			<button
@@ -278,6 +289,195 @@
 							<span>{saving ? 'Saving...' : 'Save Authentication Settings'}</span>
 						</button>
 					</form>
+				</div>
+			{/if}
+
+			<!-- Tab: SMTP & Email Settings -->
+			{#if activeTab === 'smtp'}
+				<div class="space-y-6">
+					<div>
+						<h2 class="text-xl font-bold text-white">SMTP & Email Delivery</h2>
+						<p class="text-xs text-slate-400 mt-1">
+							Configure outgoing email settings for password resets, team invites, and system notifications. Password is encrypted with AES-256 in the database.
+						</p>
+					</div>
+
+					<form
+						action="?/saveSmtp"
+						method="POST"
+						use:enhance={() => {
+							saving = true;
+							return async ({ update }) => {
+								saving = false;
+								await update();
+							};
+						}}
+						class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 space-y-6"
+					>
+						<!-- Enable SMTP Switch -->
+						<div class="flex items-center justify-between pb-5 border-b border-slate-800/80">
+							<div>
+								<div class="text-sm font-semibold text-white">Enable Outgoing Email</div>
+								<div class="text-xs text-slate-400 mt-0.5">Activate SMTP delivery for invitations and password resets</div>
+							</div>
+							<label class="relative inline-flex items-center cursor-pointer">
+								<input
+									type="checkbox"
+									name="smtp_enabled"
+									checked={data.smtp?.enabled}
+									class="sr-only peer"
+								/>
+								<div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+							</label>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div>
+								<label for="smtp_host" class="block text-xs font-medium text-slate-400 mb-1">SMTP Host</label>
+								<input
+									type="text"
+									id="smtp_host"
+									name="smtp_host"
+									value={data.smtp?.host || ''}
+									placeholder="smtp.example.com"
+									class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+								/>
+							</div>
+
+							<div>
+								<label for="smtp_port" class="block text-xs font-medium text-slate-400 mb-1">SMTP Port</label>
+								<input
+									type="number"
+									id="smtp_port"
+									name="smtp_port"
+									value={data.smtp?.port || 587}
+									placeholder="587"
+									class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+								/>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div>
+								<label for="smtp_user" class="block text-xs font-medium text-slate-400 mb-1">SMTP Username / User</label>
+								<input
+									type="text"
+									id="smtp_user"
+									name="smtp_user"
+									value={data.smtp?.user || ''}
+									placeholder="user@example.com"
+									class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+								/>
+							</div>
+
+							<div>
+								<label for="smtp_password" class="block text-xs font-medium text-slate-400 mb-1">
+									SMTP Password
+									{#if data.smtp?.hasPassword}
+										<span class="text-emerald-400 font-normal ml-1">(Configured &bull; leave blank to retain)</span>
+									{/if}
+								</label>
+								<div class="relative">
+									<input
+										type={showSecrets['smtp_pass'] ? 'text' : 'password'}
+										id="smtp_password"
+										name="smtp_password"
+										placeholder={data.smtp?.hasPassword ? '••••••••••••' : 'Enter SMTP password'}
+										class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+									/>
+									<button
+										type="button"
+										onclick={() => toggleSecret('smtp_pass')}
+										class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+									>
+										{#if showSecrets['smtp_pass']}
+											<EyeOff class="w-4 h-4" />
+										{:else}
+											<Eye class="w-4 h-4" />
+										{/if}
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+							<div>
+								<label for="smtp_from" class="block text-xs font-medium text-slate-400 mb-1">From Sender Address</label>
+								<input
+									type="text"
+									id="smtp_from"
+									name="smtp_from"
+									value={data.smtp?.from || 'EpochForge <noreply@epochforge.markenjaden.de>'}
+									placeholder="EpochForge <noreply@epochforge.markenjaden.de>"
+									class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+								/>
+							</div>
+
+							<div class="pt-5 flex items-center gap-3">
+								<input
+									type="checkbox"
+									id="smtp_secure"
+									name="smtp_secure"
+									checked={data.smtp?.secure}
+									class="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+								/>
+								<label for="smtp_secure" class="text-xs text-slate-300 select-none">
+									Use SSL/TLS (Implicit TLS, typically port 465). If unchecked, STARTTLS on 587 is used.
+								</label>
+							</div>
+						</div>
+
+						<button
+							type="submit"
+							disabled={saving}
+							class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-sm rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all"
+						>
+							<Save class="w-4 h-4" />
+							<span>{saving ? 'Saving...' : 'Save SMTP Settings'}</span>
+						</button>
+					</form>
+
+					<!-- Send Test Email Card -->
+					<div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 space-y-4">
+						<div class="flex items-center gap-3">
+							<div class="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
+								<Send class="w-5 h-5 text-indigo-400" />
+							</div>
+							<div>
+								<h3 class="font-semibold text-white text-base">Send Test Email</h3>
+								<p class="text-xs text-slate-400">Verify your SMTP configuration by dispatching a test email instantly.</p>
+							</div>
+						</div>
+
+						<form
+							action="?/testSmtp"
+							method="POST"
+							use:enhance={() => {
+								testingEmail = true;
+								return async ({ update }) => {
+									testingEmail = false;
+									await update();
+								};
+							}}
+							class="flex flex-col sm:flex-row gap-3 pt-2"
+						>
+							<input
+								type="email"
+								name="test_email"
+								required
+								placeholder="recipient@example.com"
+								class="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+							/>
+							<button
+								type="submit"
+								disabled={testingEmail}
+								class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-medium text-sm rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition-all"
+							>
+								<Send class="w-4 h-4 text-indigo-400" />
+								<span>{testingEmail ? 'Sending...' : 'Send Test Email'}</span>
+							</button>
+						</form>
+					</div>
 				</div>
 			{/if}
 

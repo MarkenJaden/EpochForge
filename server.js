@@ -5,6 +5,7 @@ import * as Y from 'yjs';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { WebSocketServer } from 'ws';
 
 dotenv.config();
 
@@ -122,9 +123,15 @@ const server = http.createServer((req, res) => {
 	}
 });
 
+const wss = new WebSocketServer({ noServer: true });
+
 server.on('upgrade', (request, socket, head) => {
 	if (request.url?.startsWith('/ws')) {
-		hocuspocus.handleConnection(socket, request, head);
+		wss.handleUpgrade(request, socket, head, (ws) => {
+			hocuspocus.handleConnection(ws, request);
+		});
+	} else {
+		socket.destroy();
 	}
 });
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TimelineEventData } from '$lib/stores/timeline-collab.svelte';
-	import { formatYear } from '$lib/utils/timeline-time';
+	import { formatYear, dateToFractionalYear, formatEventDisplayDate } from '$lib/utils/timeline-time';
 
 	let {
 		events = [],
@@ -12,15 +12,28 @@
 		onSelectEvent: (event: TimelineEventData) => void;
 	} = $props();
 
+	// Fractional coordinates for events
+	let eventCoordinates = $derived(
+		events.map((e) => {
+			const startFrac = dateToFractionalYear(e.startYear, e.startDate);
+			const endFrac = e.isSpan && e.endYear ? dateToFractionalYear(e.endYear, e.endDate) : startFrac;
+			return {
+				event: e,
+				startFrac,
+				endFrac
+			};
+		})
+	);
+
 	// Min and max years
 	let minYear = $derived.by(() => {
-		if (events.length === 0) return 2000;
-		return Math.min(...events.map((e) => e.startYear)) - 2;
+		if (eventCoordinates.length === 0) return 2000;
+		return Math.min(...eventCoordinates.map((e) => e.startFrac)) - 2;
 	});
 
 	let maxYear = $derived.by(() => {
-		if (events.length === 0) return 2030;
-		return Math.max(...events.map((e) => (e.isSpan && e.endYear ? e.endYear : e.startYear))) + 3;
+		if (eventCoordinates.length === 0) return 2030;
+		return Math.max(...eventCoordinates.map((e) => (e.event.isSpan ? e.endFrac : e.startFrac))) + 3;
 	});
 
 	let totalYears = $derived(Math.max(10, maxYear - minYear));
@@ -31,7 +44,9 @@
 	let yearHeaders = $derived.by(() => {
 		const step = pxPerYear < 35 ? 5 : pxPerYear < 70 ? 2 : 1;
 		const list: number[] = [];
-		for (let y = minYear; y <= maxYear; y += step) {
+		const start = Math.floor(minYear);
+		const end = Math.ceil(maxYear);
+		for (let y = start; y <= end; y += step) {
 			list.push(y);
 		}
 		return list;
@@ -67,9 +82,10 @@
 				<div class="p-8 text-center text-slate-500 text-xs">No events to display in Gantt grid.</div>
 			{/if}
 
-			{#each events as evt (evt.id)}
-				{@const left = (evt.startYear - minYear) * pxPerYear}
-				{@const duration = evt.isSpan && evt.endYear ? Math.max(0.5, evt.endYear - evt.startYear) : 0.5}
+			{#each eventCoordinates as item (item.event.id)}
+				{@const evt = item.event}
+				{@const left = (item.startFrac - minYear) * pxPerYear}
+				{@const duration = evt.isSpan ? Math.max(0.3, item.endFrac - item.startFrac) : 0.4}
 				{@const barWidth = Math.max(24, duration * pxPerYear)}
 
 				<div
@@ -85,7 +101,7 @@
 							{evt.title}
 						</span>
 						<span class="text-[10px] font-mono text-slate-500 flex-shrink-0">
-							{formatYear(evt.startYear)}
+							{formatEventDisplayDate(evt.startYear, evt.startDate)}
 						</span>
 					</div>
 
@@ -112,7 +128,7 @@
 							<div
 								class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rotate-45 rounded-sm shadow-md transition-all group-hover:scale-125"
 								style="left: {left}px; background-color: {evt.color || '#6366f1'};"
-								title="{evt.title} ({formatYear(evt.startYear)})"
+								title="{evt.title} ({formatEventDisplayDate(evt.startYear, evt.startDate)})"
 							></div>
 						{/if}
 					</div>
