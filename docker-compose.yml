@@ -11,9 +11,9 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://epochforge:epochforge_secret@db:5432/epochforge
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-8f7b3d1e9a2c4e6b8f7b3d1e9a2c4e6b}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://epochforge.markenjaden.de}
+      - BETTER_AUTH_URL=https://epochforge.markenjaden.de
       - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY:-epochforge-secret-key-32bytes-long-}
-      - ORIGIN=${ORIGIN:-https://epochforge.markenjaden.de}
+      - ORIGIN=https://epochforge.markenjaden.de
       - UPLOAD_DIR=/app/uploads
     volumes:
       - uploads_data:/app/uploads

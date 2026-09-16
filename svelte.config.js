@@ -10,6 +10,9 @@ const config = {
 			precompress: false,
 			envPrefix: ''
 		}),
+		csrf: {
+			checkOrigin: false
+		},
 		alias: {
 			$lib: './src/lib',
 			'$lib/*': './src/lib/*'
