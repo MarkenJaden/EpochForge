@@ -1,0 +1,43 @@
+name: CI Quality & Build Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-test:
+    name: Lint, Test & Build Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run SvelteKit Sync
+        run: npx svelte-kit sync
+
+      - name: Run Unit Tests (Vitest)
+        run: npm run test
+
+      - name: Verify Production Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgresql://epochforge:epochforge_secret@localhost:5432/epochforge
+          BETTER_AUTH_SECRET: ci-temporary-secret-for-build-validation-32chars
+          APP_ENCRYPTION_KEY: ci-temporary-aes-key-for-build-validation-32

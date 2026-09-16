@@ -9,6 +9,7 @@ RUN npm install --legacy-peer-deps
 
 # Copy source code and build
 COPY . .
+RUN mkdir -p /app/drizzle
 RUN npm run build
 
 # Production runtime stage
