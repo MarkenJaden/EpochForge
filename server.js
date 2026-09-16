@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import { Server } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 
 dotenv.config();
 
@@ -10,8 +12,24 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const DATABASE_URL =
 	process.env.DATABASE_URL || 'postgresql://epochforge:epochforge_secret@localhost:5432/epochforge';
 
-// Initialize Postgres client for Hocuspocus persistence
+// Initialize Postgres client for Hocuspocus persistence & migrations
 const sql = postgres(DATABASE_URL, { prepare: false });
+
+// Run DB migrations automatically
+async function initDb() {
+	for (let i = 0; i < 15; i++) {
+		try {
+			const db = drizzle(sql);
+			await migrate(db, { migrationsFolder: './drizzle' });
+			console.log('EpochForge database migrations successfully applied.');
+			return;
+		} catch (err) {
+			console.warn(`Database migration pending (attempt ${i + 1}/15): ${err.message}`);
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+		}
+	}
+}
+initDb();
 
 const hocuspocus = Server.configure({
 	name: 'epochforge-collab-prod',

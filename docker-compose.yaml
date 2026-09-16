@@ -4,37 +4,22 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=postgresql://epochforge:epochforge_secret@db:5432/epochforge
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-change-this-secret-in-production-epochforge}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://${COOLIFY_FQDN:-localhost}}
-      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY:-default-secret-epochforge-app-key-32bytes}
-      - ORIGIN=${ORIGIN:-https://${COOLIFY_FQDN:-localhost}}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-8f7b3d1e9a2c4e6b8f7b3d1e9a2c4e6b}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://epochforge.markenjaden.de}
+      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY:-epochforge-secret-key-32bytes-long-}
+      - ORIGIN=${ORIGIN:-https://epochforge.markenjaden.de}
       - UPLOAD_DIR=/app/uploads
     volumes:
       - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      # HTTP Router (Redirect to HTTPS)
-      - "traefik.http.routers.epochforge-http.rule=Host(`${COOLIFY_FQDN:-epochforge.example.com}`)"
-      - "traefik.http.routers.epochforge-http.entrypoints=http"
-      - "traefik.http.routers.epochforge-http.middlewares=epochforge-redirect"
-      - "traefik.http.middlewares.epochforge-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.epochforge-redirect.redirectscheme.permanent=true"
-      # HTTPS Router with WebSockets & Let's Encrypt TLS
-      - "traefik.http.routers.epochforge.rule=Host(`${COOLIFY_FQDN:-epochforge.example.com}`)"
-      - "traefik.http.routers.epochforge.entrypoints=https"
-      - "traefik.http.routers.epochforge.tls=true"
-      - "traefik.http.routers.epochforge.tls.certresolver=letsencrypt"
-      - "traefik.http.services.epochforge.loadbalancer.server.port=3000"
-      - "coolify.managed=true"
 
   db:
     image: postgres:16-alpine
