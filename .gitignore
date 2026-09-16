@@ -1,0 +1,12 @@
+.svelte-kit
+build
+node_modules
+.env
+.env.*
+!.env.example
+uploads/*
+!uploads/.gitkeep
+drizzle/*
+dist
+.DS_Store
+*.log
