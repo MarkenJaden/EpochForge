@@ -18,7 +18,7 @@
     "@hocuspocus/provider": "^2.15.2",
     "@hocuspocus/server": "^2.15.2",
     "@sveltejs/adapter-node": "^5.2.12",
-    "better-auth": "^1.1.21",
+    "better-auth": "^1.7.15",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.39.3",
